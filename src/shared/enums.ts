@@ -1,0 +1,44 @@
+export enum UserRole {
+  CUSTOMER = 'CUSTOMER',
+  ADMIN = 'ADMIN',
+  SUPER_ADMIN = 'SUPER_ADMIN',
+}
+
+export enum AuthProvider {
+  LOCAL = 'LOCAL',
+  GOOGLE = 'GOOGLE',
+  FACEBOOK = 'FACEBOOK',
+}
+
+export enum OrderStatus {
+  PENDING = 'PENDING',
+  PAYMENT_PENDING = 'PAYMENT_PENDING',
+  PAID = 'PAID',
+  PROCESSING = 'PROCESSING',
+  SHIPPED = 'SHIPPED',
+  DELIVERED = 'DELIVERED',
+  CANCELLED = 'CANCELLED',
+  REFUNDED = 'REFUNDED',
+}
+
+export enum PaymentProvider {
+  MERCADOPAGO = 'MERCADOPAGO',
+  DLOCAL_GO = 'DLOCAL_GO',
+}
+
+export enum PaymentStatus {
+  PENDING = 'PENDING',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+  REFUNDED = 'REFUNDED',
+  CANCELLED = 'CANCELLED',
+  IN_PROCESS = 'IN_PROCESS',
+}
+
+export enum VariantType {
+  SIZE = 'SIZE',
+  COLOR = 'COLOR',
+  MATERIAL = 'MATERIAL',
+  STYLE = 'STYLE',
+  OTHER = 'OTHER',
+}
