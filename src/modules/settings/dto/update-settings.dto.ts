@@ -5,6 +5,10 @@ export class UpdateSettingsDto {
   @IsOptional()
   hideOutOfStock?: boolean;
 
+  @IsString()
+  @IsOptional()
+  announcementBar?: string;
+
   // MercadoPago
   @IsBoolean()
   @IsOptional()

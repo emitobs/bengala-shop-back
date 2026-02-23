@@ -40,6 +40,7 @@ export class SettingsService {
     return {
       id: settings.id,
       hideOutOfStock: settings.hideOutOfStock,
+      announcementBar: settings.announcementBar,
       mpEnabled: settings.mpEnabled,
       dlEnabled: settings.dlEnabled,
       updatedAt: settings.updatedAt,
@@ -101,6 +102,9 @@ export class SettingsService {
     if (dto.hideOutOfStock !== undefined) {
       data.hideOutOfStock = dto.hideOutOfStock;
     }
+    if (dto.announcementBar !== undefined) {
+      data.announcementBar = dto.announcementBar || null;
+    }
     if (dto.mpEnabled !== undefined) {
       data.mpEnabled = dto.mpEnabled;
     }
@@ -137,6 +141,7 @@ export class SettingsService {
     return {
       id: settings.id,
       hideOutOfStock: settings.hideOutOfStock,
+      announcementBar: settings.announcementBar,
       mpEnabled: settings.mpEnabled,
       dlEnabled: settings.dlEnabled,
       updatedAt: settings.updatedAt,

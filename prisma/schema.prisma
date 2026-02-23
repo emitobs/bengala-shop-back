@@ -483,6 +483,7 @@ model Banner {
 model StoreSettings {
   id             String   @id @default("default")
   hideOutOfStock Boolean  @default(false)
+  announcementBar String?
 
   // MercadoPago
   mpEnabled       Boolean  @default(false)
