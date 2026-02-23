@@ -101,59 +101,68 @@ export class AssistantService {
     let toolCallCount = 0;
     let assistantMessage = '';
 
-    while (toolCallCount < MAX_TOOL_CALLS) {
-      const response = await this.openai.chat.completions.create({
-        model: this.model,
-        messages: openaiMessages,
-        tools: ASSISTANT_TOOLS as ChatCompletionTool[],
-        tool_choice: 'auto',
-      });
+    try {
+      while (toolCallCount < MAX_TOOL_CALLS) {
+        const response = await this.openai.chat.completions.create({
+          model: this.model,
+          messages: openaiMessages,
+          tools: ASSISTANT_TOOLS as ChatCompletionTool[],
+          tool_choice: 'auto',
+        });
 
-      const choice = response.choices[0];
+        const choice = response.choices[0];
 
-      if (
-        choice.finish_reason === 'stop' ||
-        !choice.message.tool_calls?.length
-      ) {
-        assistantMessage = choice.message.content ?? '';
-        break;
-      }
-
-      // Add assistant message with tool calls
-      openaiMessages.push(choice.message);
-
-      // Process each tool call
-      for (const toolCall of choice.message.tool_calls) {
-        if (toolCall.type !== 'function') continue;
-        toolCallCount++;
-        toolsUsed.push(toolCall.function.name);
-        const args = JSON.parse(toolCall.function.arguments);
-        const result = await this.executeTool(
-          toolCall.function.name,
-          args,
-          userId,
-        );
-
-        // Collect products from search results
-        if (result.products) {
-          allProducts.push(...result.products);
+        if (
+          choice.finish_reason === 'stop' ||
+          !choice.message.tool_calls?.length
+        ) {
+          assistantMessage = choice.message.content ?? '';
+          break;
         }
 
-        openaiMessages.push({
-          role: 'tool',
-          tool_call_id: toolCall.id,
-          content: JSON.stringify(result.data),
-        });
-      }
-    }
+        // Add assistant message with tool calls
+        openaiMessages.push(choice.message);
 
-    // If we exceeded max tool calls without a stop, get a final response
-    if (!assistantMessage) {
-      const finalResponse = await this.openai.chat.completions.create({
-        model: this.model,
-        messages: openaiMessages,
-      });
-      assistantMessage = finalResponse.choices[0].message.content ?? '';
+        // Process each tool call
+        for (const toolCall of choice.message.tool_calls) {
+          if (toolCall.type !== 'function') continue;
+          toolCallCount++;
+          toolsUsed.push(toolCall.function.name);
+          const args = JSON.parse(toolCall.function.arguments);
+          const result = await this.executeTool(
+            toolCall.function.name,
+            args,
+            userId,
+          );
+
+          // Collect products from search results
+          if (result.products) {
+            allProducts.push(...result.products);
+          }
+
+          openaiMessages.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            content: JSON.stringify(result.data),
+          });
+        }
+      }
+
+      // If we exceeded max tool calls without a stop, get a final response
+      if (!assistantMessage) {
+        const finalResponse = await this.openai.chat.completions.create({
+          model: this.model,
+          messages: openaiMessages,
+        });
+        assistantMessage = finalResponse.choices[0].message.content ?? '';
+      }
+    } catch (error) {
+      const err = error as Error & { status?: number; code?: string };
+      this.logger.error(
+        `OpenAI API error: ${err.message} | status=${err.status} code=${err.code}`,
+        err.stack,
+      );
+      throw error;
     }
 
     const products = this.deduplicateProducts(allProducts);
