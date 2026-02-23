@@ -48,25 +48,41 @@ function wrapInLayout(preheader, bodyContent) {
             <td style="background-color: #1a1a2e; padding: 32px 24px; text-align: center;">
               <table role="presentation" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
                 <tr>
-                  <td style="font-family: Arial, sans-serif; font-size: 14px; font-weight: 700; letter-spacing: -0.3px; padding-bottom: 12px;">
+                  <td style="font-family: Arial, sans-serif; font-size: 14px; font-weight: 700; letter-spacing: -0.3px; padding-bottom: 16px;">
                     <span style="color: #f97316;">BENGALA</span>
                     <span style="color: #ffffff;">MAX</span>
                   </td>
                 </tr>
                 <tr>
-                  <td style="font-family: Arial, sans-serif; font-size: 12px; color: #9ca3af; line-height: 1.6; padding-bottom: 8px;">
-                    Tu tienda de variedades en Uruguay
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding-top: 12px; border-top: 1px solid #374151;">
-                    <table role="presentation" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
+                  <td style="padding-bottom: 16px; border-bottom: 1px solid #374151;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
                       <tr>
-                        <td style="font-family: Arial, sans-serif; font-size: 12px; padding: 8px 0;">
-                          <a href="${frontendUrl}" style="color: #f97316; text-decoration: none;">bengalamax.com.uy</a>
+                        <td style="font-family: Arial, sans-serif; font-size: 11px; font-weight: 700; color: #f97316; text-transform: uppercase; letter-spacing: 0.5px; padding-bottom: 4px;">
+                          Fray Bentos
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="font-family: Arial, sans-serif; font-size: 11px; color: #9ca3af; line-height: 1.6; padding-bottom: 12px;">
+                          Rinc&#243;n 1783 &#8226; Tel: 098 161 513<br>
+                          18 de Julio 1174 &#8226; Tel: 091 423 838
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="font-family: Arial, sans-serif; font-size: 11px; font-weight: 700; color: #f97316; text-transform: uppercase; letter-spacing: 0.5px; padding-bottom: 4px;">
+                          Mercedes
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="font-family: Arial, sans-serif; font-size: 11px; color: #9ca3af; line-height: 1.6;">
+                          Col&#243;n 442 &#8226; Tel: 091 423 854
                         </td>
                       </tr>
                     </table>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding-top: 12px;">
+                    <a href="${frontendUrl}" style="font-family: Arial, sans-serif; font-size: 12px; color: #f97316; text-decoration: none;">bengalamax.com.uy</a>
                   </td>
                 </tr>
                 <tr>
