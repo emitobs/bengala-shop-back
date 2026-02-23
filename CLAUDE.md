@@ -65,5 +65,5 @@ npm run db:studio        # Open Prisma Studio visual editor
 ```
 
 ## Seed Data
-- Admin credentials: admin@bengalamax.com.uy / admin123
+- Admin credentials: admin@bengalamax.uy / admin123
 - Includes: categories, products with variants, shipping zones, banners

@@ -31,7 +31,7 @@ export class MailService {
   private get fromAddress(): string {
     return this.configService.get<string>(
       'SMTP_FROM',
-      'Bengala Max <noreply@bengalamax.com>',
+      'Bengala Max <noreply@bengalamax.uy>',
     );
   }
 
