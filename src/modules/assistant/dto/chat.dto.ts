@@ -14,7 +14,7 @@ class ChatMessageDto {
   role: 'user' | 'assistant';
 
   @IsString()
-  @MaxLength(500)
+  @MaxLength(10000)
   content: string;
 }
 
