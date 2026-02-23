@@ -13,7 +13,8 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
-    "db:seed": "ts-node prisma/seed.ts",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:import": "tsx prisma/import-products.ts",
     "db:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio"
   },
@@ -42,7 +43,8 @@
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.0",
     "prisma": "^6.0.0",
-    "sharp": "^0.33.0"
+    "sharp": "^0.33.0",
+    "tsx": "^4.7.0"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.0",
