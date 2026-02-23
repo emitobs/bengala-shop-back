@@ -1,12 +1,11 @@
 /**
  * Create SUPER_ADMIN user in production
  *
- * Run with:  node prisma/create-admin.js
+ * Run with:  npm run db:create-admin
  *
- * Environment variables (optional):
- *   ADMIN_EMAIL    — default: admin@bengalamax.com.uy
- *   ADMIN_PASSWORD — default: admin123
+ * Reads ADMIN_EMAIL and ADMIN_PASSWORD from .env file
  */
+require('dotenv').config();
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcrypt');
 
@@ -41,7 +40,6 @@ async function main() {
   console.log(`  Done! User ID: ${admin.id}`);
   console.log(`  Email: ${email}`);
   console.log(`  Role: SUPER_ADMIN`);
-  console.log('\n  IMPORTANT: Change the password from the admin panel after first login!');
 }
 
 main()
