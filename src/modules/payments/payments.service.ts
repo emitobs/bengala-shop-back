@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
+import { MailService } from '../mail/mail.service';
 import { MercadoPagoProvider } from './providers/mercadopago.provider';
 import { DLocalProvider } from './providers/dlocal.provider';
 import { CreatePaymentDto } from './dto/create-payment.dto';
@@ -13,6 +14,7 @@ export class PaymentsService {
   constructor(
     private prisma: PrismaService,
     private configService: ConfigService,
+    private mailService: MailService,
     private mercadoPagoProvider: MercadoPagoProvider,
     private dLocalProvider: DLocalProvider,
   ) {}
@@ -283,9 +285,45 @@ export class PaymentsService {
       }),
     ]);
 
-    // Decrement stock on successful payment
+    // Decrement stock and send confirmation email on successful payment
     if (paymentStatus === 'APPROVED') {
       await this.decrementStock(orderId);
+      await this.sendOrderConfirmation(orderId);
+    }
+  }
+
+  private async sendOrderConfirmation(orderId: string) {
+    try {
+      const order = await this.prisma.order.findUnique({
+        where: { id: orderId },
+        include: {
+          items: true,
+          user: true,
+          address: true,
+        },
+      });
+
+      if (!order || !order.user?.email) return;
+
+      const shippingAddress = order.address
+        ? `${order.address.street} ${order.address.number}${order.address.apartment ? ', ' + order.address.apartment : ''}, ${order.address.city}, ${order.address.department}`
+        : undefined;
+
+      await this.mailService.sendOrderConfirmationEmail(order.user.email, {
+        orderNumber: order.orderNumber,
+        items: order.items.map((item) => ({
+          productName: item.productName,
+          quantity: item.quantity,
+          unitPrice: Number(item.unitPrice),
+        })),
+        subtotal: Number(order.subtotal),
+        shippingCost: Number(order.shippingCost),
+        discount: Number(order.discount),
+        total: Number(order.total),
+        shippingAddress,
+      });
+    } catch (error) {
+      this.logger.error(`Failed to send order confirmation for ${orderId}: ${(error as Error).message}`);
     }
   }
 
