@@ -27,6 +27,7 @@ import { MailModule } from './modules/mail/mail.module';
 import { HealthModule } from './modules/health/health.module';
 import { AssistantModule } from './modules/assistant/assistant.module';
 import { SyncModule } from './modules/sync/sync.module';
+import { SitemapModule } from './modules/sitemap/sitemap.module';
 import appConfig from './config/app.config';
 
 @Module({
@@ -63,6 +64,7 @@ import appConfig from './config/app.config';
     HealthModule,
     AssistantModule,
     SyncModule,
+    SitemapModule,
   ],
   providers: [
     {
