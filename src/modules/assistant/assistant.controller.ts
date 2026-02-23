@@ -1,4 +1,13 @@
-import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  HttpException,
+  HttpStatus,
+  Logger,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { Public } from '../../common/decorators/public.decorator';
 import { OptionalAuthGuard } from '../../common/guards/optional-auth.guard';
@@ -8,6 +17,8 @@ import { ChatFeedbackDto } from './dto/feedback.dto';
 
 @Controller('assistant')
 export class AssistantController {
+  private readonly logger = new Logger(AssistantController.name);
+
   constructor(private assistantService: AssistantService) {}
 
   @Public()
@@ -15,12 +26,30 @@ export class AssistantController {
   @Throttle({ default: { ttl: 60000, limit: 10 } })
   @Post('chat')
   async chat(@Body() dto: ChatRequestDto, @Req() req: any) {
-    const userId = req.user?.id ?? undefined;
-    return this.assistantService.chat(
-      dto.messages,
-      userId,
-      dto.conversationId,
-    );
+    try {
+      const userId = req.user?.id ?? undefined;
+      return await this.assistantService.chat(
+        dto.messages,
+        userId,
+        dto.conversationId,
+      );
+    } catch (error) {
+      const err = error as Error & { status?: number; code?: string };
+      this.logger.error(
+        `Chat endpoint error: ${err.message}`,
+        err.stack,
+      );
+
+      // Return a structured error so frontend can log details
+      throw new HttpException(
+        {
+          statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+          message: `Assistant error: ${err.message ?? 'Unknown error'}`,
+          errorCode: err.code ?? 'UNKNOWN',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   @Public()

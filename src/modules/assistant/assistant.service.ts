@@ -179,9 +179,9 @@ export class AssistantService {
         assistantMessage = finalResponse.choices[0].message.content ?? '';
       }
     } catch (error) {
-      const err = error as Error & { status?: number; code?: string };
+      const err = error as any;
       this.logger.error(
-        `OpenAI API error: ${err.message} | status=${err.status} code=${err.code}`,
+        `OpenAI API error: ${err.message} | status=${err.status} code=${err.code} | type=${err.type} | response=${JSON.stringify(err.error ?? err.response?.data ?? null)}`,
         err.stack,
       );
       throw error;
