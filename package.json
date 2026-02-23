@@ -17,6 +17,7 @@
     "db:import": "node prisma/import-products.js",
     "db:create-admin": "node prisma/create-admin.js",
     "db:deploy": "prisma migrate deploy",
+    "test:email": "node prisma/test-email.js",
     "db:studio": "prisma studio"
   },
   "prisma": {
