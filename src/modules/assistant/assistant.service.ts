@@ -42,10 +42,12 @@ Contexto del cliente:
 Comportamiento de vendedor:
 - Busca EXACTAMENTE lo que el cliente pide.
 - Si el producto exacto no existe, busca con termino mas amplio y ofrece lo mejor.
-- Se DECISIVO con productos basicos (lapicera, goma, regla, pegamento): elegí el mejor y agregalo sin preguntar.
-- Pero cuando hay variedad de estilo/gusto (mochilas, cartucheras, cuadernolas de colores), pregunta brevemente la preferencia ANTES de agregar: "¿Preferis mochila deportiva, clasica o con diseño? Tenemos estas 2-3 opciones:" y mostra solo esas.
+- Se DECISIVO: cuando muestres opciones, SIEMPRE recomienda UNA como la mejor. No listes y preguntes "¿cual queres?" — decí "Te recomiendo X, es ideal porque... ¿Lo agrego al carrito?" y mostra las otras como alternativas.
+- Para productos basicos (lapicera, goma, regla): elegí el mejor y agregalo directo.
+- Para productos con variedad de estilo (mochilas, cartucheras): mostra 2-3 opciones pero SIEMPRE destaca tu recomendacion.
 - MAXIMO 3-4 productos por respuesta. Menos es mas.
 - Se entusiasta pero conciso. Nada de parrafos largos.
+- NUNCA termines con "¿Alguno te interesa?" o "¿Cual preferis?" — termina con una recomendacion clara y ofrecé agregarlo al carrito.
 
 Carrito de compras (MUY IMPORTANTE):
 - Cuando el cliente pide que armes un carrito o lista: PRIMERO preguntale brevemente para quien es (edad, genero) si no lo dijo. Despues busca y armá.
@@ -699,30 +701,37 @@ export class AssistantService {
 
   /**
    * Only keep products whose name is actually mentioned in the assistant's
-   * response text, capped at MAX_PRODUCT_CARDS. This prevents flooding the
-   * chat with cards from every search result.
+   * response text, capped at MAX_PRODUCT_CARDS. Uses normalized word-overlap
+   * matching to handle punctuation differences and minor rephrasing.
    */
   private filterMentionedProducts(
     products: ChatProduct[],
     assistantMessage: string,
   ): ChatProduct[] {
     const MAX_PRODUCT_CARDS = 6;
-    const msgLower = assistantMessage.toLowerCase();
 
-    // Keep products where at least the first significant word of the name appears
+    // Strip punctuation and normalize whitespace for fuzzy matching
+    const normalize = (s: string) =>
+      s
+        .toLowerCase()
+        .replace(/[^a-záéíóúñü0-9\s]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    const msgNorm = normalize(assistantMessage);
+
     const mentioned = products.filter((p) => {
-      const nameLower = p.name.toLowerCase();
-      // Check if the full name or a significant portion appears
-      if (msgLower.includes(nameLower)) return true;
-      // Check first 2-3 significant words (skip very short words)
-      const words = nameLower
-        .split(/\s+/)
-        .filter((w) => w.length > 2);
-      if (words.length >= 2) {
-        const partial = words.slice(0, 3).join(' ');
-        return msgLower.includes(partial);
-      }
-      return words.length === 1 && msgLower.includes(words[0]);
+      const nameNorm = normalize(p.name);
+
+      // Direct substring match (after normalizing punctuation)
+      if (msgNorm.includes(nameNorm)) return true;
+
+      // Word overlap: significant words (>3 chars) from the name in the message
+      const nameWords = nameNorm.split(/\s+/).filter((w) => w.length > 3);
+      if (nameWords.length < 2) return false;
+
+      const matchCount = nameWords.filter((w) => msgNorm.includes(w)).length;
+      return matchCount >= Math.ceil(nameWords.length * 0.6);
     });
 
     // If filter returned something, use it; otherwise fall back to first few
