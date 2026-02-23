@@ -10,6 +10,7 @@ import { ProductsService } from '../products/products.service';
 import { CategoriesService } from '../categories/categories.service';
 import { OrdersService } from '../orders/orders.service';
 import { ShippingService } from '../shipping/shipping.service';
+import { CartService } from '../cart/cart.service';
 import { ProductQueryDto } from '../products/dto/product-query.dto';
 import { ASSISTANT_TOOLS } from './assistant.tools';
 
@@ -26,6 +27,7 @@ export interface ChatResponse {
   products: ChatProduct[];
   conversationId: string;
   messageId: string;
+  cartUpdated?: boolean;
 }
 
 const SYSTEM_PROMPT = `Sos Rayitas, el asistente de ventas de Bengala Max, una tienda online de variedades en Uruguay. Sos un vendedor nato: tu objetivo es ayudar al cliente a encontrar lo que busca y SIEMPRE cerrar una venta.
@@ -34,7 +36,7 @@ Comportamiento de vendedor:
 - Busca EXACTAMENTE lo que el cliente pide. Si pide "cuadernola rosada", busca eso.
 - Si el producto exacto no esta disponible o no existe, NUNCA digas solo "no tenemos". Siempre ofrece alternativas: "No encontre la cuadernola rosada, pero tenemos estas cuadernolas que te pueden gustar:" y busca con un termino mas amplio (ej: "cuadernola").
 - Si la busqueda es amplia, pregunta brevemente que necesita para afinar: "¿Buscas cuadernos chicos, grandes, de espiral?"
-- Mostra los productos mas relevantes primero (3-4 maximo, no tires todo junto).
+- Mostra los productos mas relevantes primero (maximo 3-4, no tires todo junto).
 - Una vez que el cliente eligio o mostro interes, sugeri complementos naturales: "¿Necesitas lapiceras o un estuche tambien?"
 - Se entusiasta pero no invasivo. Recomenda, no empujes.
 - Todos los productos que muestres estan disponibles y con stock. Si un producto no tiene stock, no lo muestres.
@@ -45,6 +47,13 @@ Estrategia de venta:
 - Si el cliente esta indeciso, destaca el producto que mas le conviene y explica por que.
 - Cuando un cliente llega sin saber que quiere, preguntale para quien es o que ocasion, y sugeri productos populares.
 
+Carrito de compras:
+- Cuando el cliente pide que le armes un carrito, lista de utiles, o quiere comprar varios productos: usa la tool add_to_cart para agregar productos directamente al carrito.
+- Si el cliente no esta logueado, indicale que inicie sesion para poder armar el carrito.
+- Cuando armes una lista (ej: utiles escolares), busca cada tipo de producto por separado, elegí la mejor opcion de cada uno, y agregalos al carrito uno por uno.
+- Despues de agregar al carrito, confirma brevemente lo que agregaste y el total aproximado. No muestres las cards de los productos que ya agregaste.
+- Si un producto no se pudo agregar (sin stock, error), informale al cliente.
+
 Reglas generales:
 - Responde siempre en español informal rioplatense (vos/tu, "dale", "genial", "barbaro")
 - Moneda: pesos uruguayos (UYU), formato: $1.234
@@ -53,9 +62,16 @@ Reglas generales:
 - Si la primera busqueda no da buenos resultados, intenta con sinonimos o terminos mas amplios
 - Si el usuario pregunta por un pedido y no esta logueado, indicale que inicie sesion
 - No uses markdown (bold, italic, headers) — responde en texto plano
-- Cuando muestres productos, no repitas nombre/precio ya que se ven en las cards. Agrega valor: opina, compara, destaca ventajas.`;
+- Cuando muestres productos, no repitas nombre/precio ya que se ven en las cards. Agrega valor: opina, compara, destaca ventajas.
+- Cuando hagas busquedas multiples (ej: lista de utiles), hacelo de forma eficiente: busca cada categoria en una tool call separada, no mandes 8 busquedas a la vez.`;
 
-const MAX_TOOL_CALLS = 5;
+const MAX_TOOL_CALLS = 10;
+
+interface ToolResult {
+  data: any;
+  products?: ChatProduct[];
+  cartUpdated?: boolean;
+}
 
 @Injectable()
 export class AssistantService {
@@ -70,6 +86,7 @@ export class AssistantService {
     private categoriesService: CategoriesService,
     private ordersService: OrdersService,
     private shippingService: ShippingService,
+    private cartService: CartService,
   ) {
     const baseURL = this.configService.get<string>('OPENAI_BASE_URL');
     this.openai = new OpenAI({
@@ -86,6 +103,7 @@ export class AssistantService {
   ): Promise<ChatResponse> {
     const allProducts: ChatProduct[] = [];
     const toolsUsed: string[] = [];
+    let cartUpdated = false;
 
     const openaiMessages: ChatCompletionMessageParam[] = [
       { role: 'system', content: SYSTEM_PROMPT },
@@ -140,6 +158,10 @@ export class AssistantService {
             allProducts.push(...result.products);
           }
 
+          if (result.cartUpdated) {
+            cartUpdated = true;
+          }
+
           openaiMessages.push({
             role: 'tool',
             tool_call_id: toolCall.id,
@@ -187,6 +209,7 @@ export class AssistantService {
       products,
       conversationId: log?.conversationId ?? conversationId ?? '',
       messageId: log?.messageId ?? '',
+      ...(cartUpdated && { cartUpdated: true }),
     };
   }
 
@@ -254,7 +277,7 @@ export class AssistantService {
     name: string,
     args: Record<string, any>,
     userId?: string,
-  ): Promise<{ data: any; products?: ChatProduct[] }> {
+  ): Promise<ToolResult> {
     try {
       switch (name) {
         case 'search_products':
@@ -269,6 +292,8 @@ export class AssistantService {
           return this.toolGetShippingInfo();
         case 'get_store_info':
           return this.toolGetStoreInfo(args.topic);
+        case 'add_to_cart':
+          return this.toolAddToCart(args.items, userId);
         default:
           return { data: { error: `Unknown tool: ${name}` } };
       }
@@ -283,7 +308,7 @@ export class AssistantService {
     categorySlug?: string;
     minPrice?: number;
     maxPrice?: number;
-  }): Promise<{ data: any; products: ChatProduct[] }> {
+  }): Promise<ToolResult> {
     // Use PostgreSQL full-text search for better relevance when a query is provided
     if (args.query && args.query.trim()) {
       return this.fullTextSearchProducts(args);
@@ -320,7 +345,7 @@ export class AssistantService {
     categorySlug?: string;
     minPrice?: number;
     maxPrice?: number;
-  }): Promise<{ data: any; products: ChatProduct[] }> {
+  }): Promise<ToolResult> {
     const rawQuery = (args.query ?? '').trim();
     const searchTerms = rawQuery
       .split(/\s+/)
@@ -373,7 +398,7 @@ export class AssistantService {
     const rows: any[] = await this.prisma.$queryRawUnsafe(
       `SELECT p.id, p.name, p.slug, p."basePrice",
               p."compareAtPrice", p."shortDescription",
-              (SELECT url FROM "product_images" pi WHERE pi."productId" = p.id AND pi."isPrimary" = true LIMIT 1) as image,
+              (SELECT url FROM "product_images" pi WHERE pi."productId" = p.id ORDER BY pi."isPrimary" DESC, pi."sortOrder" ASC LIMIT 1) as image,
               (CASE WHEN p.name ILIKE $${ilikeIdx} THEN 100 ELSE 0 END) +
               (CASE WHEN to_tsvector('simple', coalesce(p.name, ''))
                          @@ to_tsquery('simple', $${tsIdx}) THEN 50 ELSE 0 END) +
@@ -419,10 +444,7 @@ export class AssistantService {
     };
   }
 
-  private formatProductResults(result: any): {
-    data: any;
-    products: ChatProduct[];
-  } {
+  private formatProductResults(result: any): ToolResult {
     // Only include products that have at least one variant in stock
     const inStockItems = result.data.filter(
       (p: any) => p.variants?.some((v: any) => v.stock > 0) ?? false,
@@ -453,7 +475,7 @@ export class AssistantService {
 
   private async toolGetProductDetails(
     slug: string,
-  ): Promise<{ data: any; products: ChatProduct[] }> {
+  ): Promise<ToolResult> {
     const p = await this.productsService.findBySlug(slug);
 
     const product: ChatProduct = {
@@ -486,7 +508,7 @@ export class AssistantService {
     };
   }
 
-  private async toolGetCategories(): Promise<{ data: any }> {
+  private async toolGetCategories(): Promise<ToolResult> {
     const categories = await this.categoriesService.findAll();
 
     return {
@@ -502,7 +524,7 @@ export class AssistantService {
   private async toolCheckOrderStatus(
     orderNumber: string,
     userId?: string,
-  ): Promise<{ data: any }> {
+  ): Promise<ToolResult> {
     if (!userId) {
       return {
         data: {
@@ -542,7 +564,7 @@ export class AssistantService {
     }
   }
 
-  private async toolGetShippingInfo(): Promise<{ data: any }> {
+  private async toolGetShippingInfo(): Promise<ToolResult> {
     const result = await this.shippingService.findAllZones();
 
     return {
@@ -556,7 +578,76 @@ export class AssistantService {
     };
   }
 
-  private toolGetStoreInfo(topic: string): { data: any } {
+  private async toolAddToCart(
+    items: { slug: string; quantity?: number }[],
+    userId?: string,
+  ): Promise<ToolResult> {
+    if (!userId) {
+      return {
+        data: {
+          error:
+            'El usuario no esta logueado. Indicale que debe iniciar sesion para poder agregar productos al carrito.',
+        },
+      };
+    }
+
+    if (!items || items.length === 0) {
+      return { data: { error: 'No se proporcionaron productos para agregar.' } };
+    }
+
+    const results: { slug: string; name: string; added: boolean; error?: string }[] = [];
+    let anyAdded = false;
+
+    for (const item of items) {
+      try {
+        // Find product by slug
+        const product = await this.prisma.product.findUnique({
+          where: { slug: item.slug },
+          include: {
+            variants: {
+              where: { isActive: true, stock: { gt: 0 } },
+              orderBy: { createdAt: 'asc' },
+              take: 1,
+            },
+          },
+        });
+
+        if (!product || !product.isActive) {
+          results.push({ slug: item.slug, name: item.slug, added: false, error: 'Producto no encontrado' });
+          continue;
+        }
+
+        const variant = product.variants[0];
+        if (!variant) {
+          results.push({ slug: item.slug, name: product.name, added: false, error: 'Sin stock disponible' });
+          continue;
+        }
+
+        await this.cartService.addItem(userId, {
+          productId: product.id,
+          variantId: variant.id,
+          quantity: item.quantity ?? 1,
+        });
+
+        results.push({ slug: item.slug, name: product.name, added: true });
+        anyAdded = true;
+      } catch (error) {
+        const msg = (error as Error).message ?? 'Error desconocido';
+        results.push({ slug: item.slug, name: item.slug, added: false, error: msg });
+      }
+    }
+
+    const addedCount = results.filter((r) => r.added).length;
+    return {
+      data: {
+        results,
+        summary: `${addedCount} de ${items.length} productos agregados al carrito`,
+      },
+      cartUpdated: anyAdded,
+    };
+  }
+
+  private toolGetStoreInfo(topic: string): ToolResult {
     const info: Record<string, any> = {
       payment_methods: {
         methods: [

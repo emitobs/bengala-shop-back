@@ -110,4 +110,37 @@ export const ASSISTANT_TOOLS: ChatCompletionTool[] = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'add_to_cart',
+      description:
+        "Add products to the customer's shopping cart. Use when the customer asks to buy, add to cart, or build a list/cart of products. Requires the customer to be logged in. Use the product slug from search results.",
+      parameters: {
+        type: 'object',
+        properties: {
+          items: {
+            type: 'array',
+            description: 'Products to add to the cart',
+            items: {
+              type: 'object',
+              properties: {
+                slug: {
+                  type: 'string',
+                  description:
+                    'Product slug (URL identifier from search results)',
+                },
+                quantity: {
+                  type: 'number',
+                  description: 'Quantity to add (default: 1)',
+                },
+              },
+              required: ['slug'],
+            },
+          },
+        },
+        required: ['items'],
+      },
+    },
+  },
 ];
