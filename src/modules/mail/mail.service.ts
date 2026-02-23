@@ -139,6 +139,8 @@ export class MailService {
                 <tr>
                   <td style="padding-top: 12px;">
                     <a href="${this.frontendUrl}" style="font-family: Arial, sans-serif; font-size: 12px; color: #f97316; text-decoration: none;">bengalamax.com.uy</a>
+                    <span style="font-family: Arial, sans-serif; font-size: 12px; color: #6b7280;">&nbsp;&nbsp;|&nbsp;&nbsp;</span>
+                    <a href="mailto:contacto@bengalamax.uy" style="font-family: Arial, sans-serif; font-size: 12px; color: #9ca3af; text-decoration: none;">contacto@bengalamax.uy</a>
                   </td>
                 </tr>
                 <tr>
