@@ -5,6 +5,7 @@ import { SettingsService } from '../settings/settings.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductQueryDto } from './dto/product-query.dto';
+import { AddProductImageDto } from './dto/add-product-image.dto';
 import { generateSlug } from '../../common/utils/slug.util';
 
 @Injectable()
@@ -12,7 +13,7 @@ export class ProductsService {
   constructor(
     private prisma: PrismaService,
     private settingsService: SettingsService,
-  ) {}
+  ) { }
 
   async findAll(query: ProductQueryDto) {
     const { page = 1, limit = 20, search, categorySlug, minPrice, maxPrice, isFeatured, hasDiscount, sortBy } = query;
@@ -207,16 +208,16 @@ export class ProductsService {
           : undefined,
         variants: dto.variants?.length
           ? {
-              create: dto.variants.map((v) => ({
-                name: v.name,
-                sku: v.sku,
-                type: v.type as any,
-                value: v.value,
-                priceAdjustment: v.priceAdjustment ?? 0,
-                stock: v.stock,
-                lowStockThreshold: v.lowStockThreshold ?? 5,
-              })),
-            }
+            create: dto.variants.map((v) => ({
+              name: v.name,
+              sku: v.sku,
+              type: v.type as any,
+              value: v.value,
+              priceAdjustment: v.priceAdjustment ?? 0,
+              stock: v.stock,
+              lowStockThreshold: v.lowStockThreshold ?? 5,
+            })),
+          }
           : undefined,
       },
       include: {
@@ -353,5 +354,115 @@ export class ProductsService {
       })),
       meta: { page, limit, total, totalPages, hasNext: page < totalPages, hasPrev: page > 1 },
     };
+  }
+
+  // --- Product Image Management ---
+
+  async findBySku(sku: string) {
+    const product = await this.prisma.product.findUnique({
+      where: { sku },
+      include: {
+        images: { orderBy: { sortOrder: 'asc' } },
+        categories: { include: { category: { select: { id: true, name: true, slug: true } } } },
+        variants: { where: { isActive: true } },
+      },
+    });
+
+    if (!product) {
+      throw new NotFoundException(`Product with SKU "${sku}" not found`);
+    }
+
+    return {
+      ...product,
+      categories: product.categories.map((pc) => pc.category),
+    };
+  }
+
+  async addImage(productId: string, dto: AddProductImageDto) {
+    const product = await this.prisma.product.findUnique({ where: { id: productId } });
+    if (!product) throw new NotFoundException('Product not found');
+
+    // If this image is primary, unset other primary images
+    if (dto.isPrimary) {
+      await this.prisma.productImage.updateMany({
+        where: { productId, isPrimary: true },
+        data: { isPrimary: false },
+      });
+    }
+
+    // Auto-set sortOrder if not provided
+    if (dto.sortOrder === undefined) {
+      const maxSort = await this.prisma.productImage.findFirst({
+        where: { productId },
+        orderBy: { sortOrder: 'desc' },
+        select: { sortOrder: true },
+      });
+      dto.sortOrder = (maxSort?.sortOrder ?? -1) + 1;
+    }
+
+    // If it's the first image, make it primary automatically
+    const imageCount = await this.prisma.productImage.count({ where: { productId } });
+    const isPrimary = dto.isPrimary ?? (imageCount === 0);
+
+    const image = await this.prisma.productImage.create({
+      data: {
+        productId,
+        url: dto.url,
+        altText: dto.altText ?? product.name,
+        sortOrder: dto.sortOrder,
+        isPrimary,
+      },
+    });
+
+    return image;
+  }
+
+  async removeImage(productId: string, imageId: string) {
+    const image = await this.prisma.productImage.findFirst({
+      where: { id: imageId, productId },
+    });
+    if (!image) throw new NotFoundException('Image not found');
+
+    await this.prisma.productImage.delete({ where: { id: imageId } });
+
+    // If the deleted image was primary, set the first remaining image as primary
+    if (image.isPrimary) {
+      const firstImage = await this.prisma.productImage.findFirst({
+        where: { productId },
+        orderBy: { sortOrder: 'asc' },
+      });
+      if (firstImage) {
+        await this.prisma.productImage.update({
+          where: { id: firstImage.id },
+          data: { isPrimary: true },
+        });
+      }
+    }
+
+    return { message: 'Image removed' };
+  }
+
+  async updateImage(productId: string, imageId: string, dto: Partial<AddProductImageDto>) {
+    const image = await this.prisma.productImage.findFirst({
+      where: { id: imageId, productId },
+    });
+    if (!image) throw new NotFoundException('Image not found');
+
+    if (dto.isPrimary) {
+      await this.prisma.productImage.updateMany({
+        where: { productId, isPrimary: true },
+        data: { isPrimary: false },
+      });
+    }
+
+    return this.prisma.productImage.update({
+      where: { id: imageId },
+      data: {
+        url: dto.url,
+        altText: dto.altText,
+        sortOrder: dto.sortOrder,
+        isPrimary: dto.isPrimary,
+      },
+    });
   }
 }
